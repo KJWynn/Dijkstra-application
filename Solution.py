@@ -2,7 +2,7 @@ from __future__ import annotations
 
 class MinHeap:
     """
-    Modified from FIT1008
+    Modified from provided FIT1008 implementation by Brendon Taylor and Jackson Goerner
 
     Min Heap implementation using a Python in-built list.
     Parent node's index is (child node's index - 1) // 2.
@@ -14,19 +14,19 @@ class MinHeap:
 
     """
 
-    def __init__(self):
+    def __init__(self, size):
         """
         :Time complexity: O(1)
         :Aux space complexity: O(1)
         """
-        self.array = []
+        self.array = [None for i in range(size)]
 
     def print_heap(self):
         print("\n")
         for vertex in self.array:
             print(vertex)
 
-    def rise(self, added_item_idx: int):
+    def rise(self, added_item_idx):
         """
         Rise the added item to its correct position
 
@@ -38,7 +38,7 @@ class MinHeap:
         """
 
         added_item = self.array[added_item_idx]
-        while added_item_idx >0 and self.array[added_item_idx].distance <self.array[(added_item_idx - 1) // 2].distance:
+        while added_item_idx > 0 and self.array[added_item_idx].distance <self.array[(added_item_idx - 1) // 2].distance:
             # swap added element with its parent if added element is smaller than its parent node
             self.array[added_item_idx], self.array[(added_item_idx - 1) // 2] = self.array[(added_item_idx - 1) // 2], \
                                                                                 self.array[added_item_idx]
@@ -50,7 +50,7 @@ class MinHeap:
 
         self.array[added_item_idx] = added_item
 
-    def sink(self, outofplace_item_idx: int):
+    def sink(self, outofplace_item_idx):
         """
         Sink the out-of-place item to its correct position. Also updates index of item(position in heap)
 
@@ -85,7 +85,7 @@ class MinHeap:
         # update index of outofplace item
         self.array[outofplace_item_idx].index = saved_smallestchild_index
 
-    def smallest_child(self, item_idx: int) -> int:
+    def smallest_child(self, item_idx):
         """
         Returns the index of item's child that has the smaller value.
 
@@ -104,7 +104,7 @@ class MinHeap:
         else:
             return right_idx
 
-    def add(self, item: Vertex):
+    def add(self, item):
         """
         Add an item into the heap, then rises the item to its correct postion
         
@@ -114,10 +114,13 @@ class MinHeap:
         :Time complexity: O(log N), where N is the number of nodes in the heap
 
         """
-        self.array.append(item) # O(1)
-        self.rise(len(self.array) - 1) # O(log N)
+        self.array[item.index] = item # O(1)
+        self.rise(item.index) # O(log N)
 
-    def getMin(self) -> Vertex:
+
+
+
+    def getMin(self):
         """
         Replaces minimum item(root) with last item, then sinks last item into its correct position, returns minimum item.
         
@@ -148,7 +151,7 @@ class Graph:
     """
     Graph data structure. Stores a list of vertices, the number of vertices, V(last vertex+1). The vertices are from 0..num_vertices-1
     """
-    def __init__(self, vertices: list[Vertex]):
+    def __init__(self, vertices):
         """
         Initialize graph with vertices.
 
@@ -175,7 +178,7 @@ class Vertex:
     The item attribute is the shorthand way of representing the Vertex
 
     """
-    def __init__(self, item: int):
+    def __init__(self, item):
         """
         Initialize the vertex. Set distance to infinity
         
@@ -215,7 +218,7 @@ class Edge:
     Edge class. Stores the destination vertex and the two weights
 
     """
-    def __init__(self, v: Vertex, w1: int, w2: int):
+    def __init__(self, v, w1, w2):
         """
         Initialize the vertex. Set distance to infinity
         
@@ -235,7 +238,7 @@ class Edge:
         return_string += f"({self.v.item}, {self.w1}, {self.w2})"
         return return_string
 
-def setup_mapping(num_vertices: int, passengers: list[int], roads:list[tuple[int, int, int, int]])->list[Vertex]:
+def setup_mapping(num_vertices, passengers, roads):
     """
     Helper function which processes the input edges and returns a list of vertices, each vertex has its list of edges.
     For example, Vertex 3 is at position 3 in this returned list and can be accessed via list[3]
@@ -273,10 +276,14 @@ def setup_mapping(num_vertices: int, passengers: list[int], roads:list[tuple[int
         vertex.has_passenger = True
         vertex.has_passenger_along = True
 
+    # for vertex in vertex_with_edges:
+    #     print(vertex)
+
+
     return vertex_with_edges
 
 
-def dijkstra(graph:Graph, start:int, end:int, last_vertex:int, actual_end:int) -> list[int]:
+def dijkstra(graph, start, end, last_vertex, actual_end):
     """
     Returns a list of integers representing the path with the minimum distance
 
@@ -294,7 +301,7 @@ def dijkstra(graph:Graph, start:int, end:int, last_vertex:int, actual_end:int) -
     """
     potential_end = None
 
-    def convert_vertex(item:int)->int:
+    def convert_vertex(item):
         """
         Helper function to convert back any linked graph vertices to its original vertex, e.g. vertex 21 is actually the original vertex 1 + number_vertices(20) so convert 21
         back to 1 by doing 21 - 20. 
@@ -309,26 +316,43 @@ def dijkstra(graph:Graph, start:int, end:int, last_vertex:int, actual_end:int) -
             item = item - (last_vertex + 1)
         return item
     
-    heap = MinHeap()
+    heap = MinHeap(graph.num_vertices)
     # initialize heap, O(V log V) time complexity, O(V) aux space complexity for the heap as we are adding V vertices into the heap's array
+    
+    # To account for invalid inputs, where there might be some vertices in the range(0...L-1) is not connected to the graph
+    # remove Nones from heap, and update the indexes to account for removed "Nones", essentially "shuffle" elements to the left. 
+    # Eventually left with Nones at the end of the heap array.
+    number_of_nones = 0
     for i in range(graph.num_vertices): # O(V)
-        vertex = graph.vertices[i]
-        if i == start:
-            vertex.distance = 0 # set source vertex distance to be 0
-        heap.add(vertex)  # O(log V)
+        if graph.vertices[i] is None:
+            number_of_nones += 1
+            continue
+        if graph.vertices[i] is not None:
+            vertex = graph.vertices[i ]
+            vertex.index -= number_of_nones
+            if i == start:
+                vertex.distance = 0
+            heap.add(vertex)
+
+    # remove Nones from end of heap array, O(V)
+    last = heap.array[-1]
+    while last is None:
+        heap.array.pop()
+        last = heap.array[-1]
+
 
     # Overall O(V^2 log V), because examining the outgoing edges of the served vertex and performing heap update is O(V log V) and this is done V times
     minimum = None
     while len(heap.array) > 0: # O(V)
         minimum = heap.getMin()  # get minimum vertex, O(log L)
-        print(f"{minimum} is served from heap. ")
+        # print(f"{minimum} is served from heap. ")
 
         if minimum.item == end:
-            print(f"minimum is reached {minimum.item}")
+            # print(f"minimum is reached {minimum.item}")
             break
         elif minimum.item == actual_end:
             potential_end = minimum
-        heap.print_heap()
+        # heap.print_heap()
         minimum.discovered = True
         minimum.visited = True
 
@@ -338,7 +362,7 @@ def dijkstra(graph:Graph, start:int, end:int, last_vertex:int, actual_end:int) -
             # select edge weight to be used, and set outgoing edges to have_passenger_along so that in future the second weight will be used
             if minimum.has_passenger_along:
                 if edge.v.item != start:
-                    print(f"The current vertex is {minimum.item} and the adjacent edge is {edge.v.item}")
+                    # print(f"The current vertex is {minimum.item} and the adjacent edge is {edge.v.item}")
                     edge.v.has_passenger_along = True
                     edge.actual_weight = edge.w2
             else:
@@ -348,44 +372,43 @@ def dijkstra(graph:Graph, start:int, end:int, last_vertex:int, actual_end:int) -
 
             # if its adjacent vertex has not been discovered, update distance from infinity to distance
             if not adjacent_vertex.discovered:  
-                print(f"The current vertex is {minimum.item} and the adjacent edge is {edge.v.item}")
-                print(f"{adjacent_vertex} is discovered so its infinity distance is overwritten. It is at position {adjacent_vertex.index}")
+                # print(f"The current vertex is {minimum.item} and the adjacent edge is {edge.v.item}")
+                # print(f"{adjacent_vertex} is discovered so its infinity distance is overwritten. It is at position {adjacent_vertex.index}")
                 adjacent_vertex.discovered = True
                 adjacent_vertex.distance = minimum.distance + edge.actual_weight
                 adjacent_vertex.previous = minimum  # set its previous vertex
 
                 # update heap, O(log V)
                 heap.rise(adjacent_vertex.index)
-                heap.print_heap()
+                # heap.print_heap()Fsetup
 
             # if vertex was discovered before, update distance if smaller distance available
             elif not adjacent_vertex.visited:
-                print(f"{adjacent_vertex} has been discovered but now we need to check if distance is updated")
+                # print(f"{adjacent_vertex} has been discovered but now we need to check if distance is updated")
                 if adjacent_vertex.distance > minimum.distance + edge.actual_weight:
-                    print(f"Distance is updated from {adjacent_vertex.distance} to {minimum.distance + edge.actual_weight}")
+                    # print(f"Distance is updated from {adjacent_vertex.distance} to {minimum.distance + edge.actual_weight}")
                     adjacent_vertex.distance = minimum.distance + edge.actual_weight
                     adjacent_vertex.previous = minimum
 
                     # update heap, O(log V)
                     heap.rise(adjacent_vertex.index)
-                    heap.print_heap()
+                    # heap.print_heap()
 
-    print(f"The end's distance is {minimum.distance}")
+    # print(f"The end's distance is {minimum.distance}")
     
 
-    # Check if there was no need to link the passenger(detour), and just directly return this shortest path
+    # Maybe there was no need to take detour to find passenger. If so, return this shortest path
     route = []
     if potential_end is not None and potential_end.distance < minimum.distance:
         previous = potential_end
     else:
         previous = minimum
     graph.cost = previous.distance
-    print(previous)
+    # print(previous)
         
     # O(E), trace back the path
     while previous is not None:
         route.append(convert_vertex(previous.item))
-        print(route)
         if previous.previous is not None and previous.previous.previous is not None:
             if convert_vertex(previous.item) == convert_vertex(previous.previous.item):
                 previous = previous.previous.previous
@@ -397,30 +420,35 @@ def dijkstra(graph:Graph, start:int, end:int, last_vertex:int, actual_end:int) -
     return route
 
 
-def optimalRoute(start: int, end:int, passengers:list[int], roads:list[tuple[int,int,int,int]]):
+def optimalRoute(start, end, passengers, roads):
 
     """
     Returns the path with minimum driving distance from start to end.
 
     Approach:
     Modeled as a graph, the roads are edges, passengers are special vertices. Use dijkstra to find the shortest
-    path from start vertex to end vertex.
+    path from start vertex to end vertex. There are two options, either find shortest path from start to end without taking any detours, or
+    choose to take one detour to visit a passenger. 
 
-    First process roads(edges) to get the number of vertices, which allows us to get the vertices of the graph as
-    [0... number_of_vertices - 1]
+    First process roads(edges) to get the number of vertices, which allows us to get the vertices of the graph as [0... number_of_vertices - 1]
 
-    Run dijkstra on a normal graph from start to end to find minimum driving distance. If passenger locations are
-    on the way, the algorithm ensures that all roads traversed after a passenger is picked up will take the carpool lane.
+    Once a passenger location(vertex) is visited, all subsequent edges(roads) will use second weight(carpool lane).
 
-    Run dijkstra on a new graph with double the vertices of the first graph. To differentiate the locations of the two graphs,
-    graph2 vertex = graph1 vertex + number of vertices. 
+    Run dijkstra on a graph with double the required vertices/edges. To differentiate the locations of the two graphs, graph2 vertex = graph1 vertex + number of vertices. 
     e.g. For a graph of 5 vertices, graph1's vertex 0 will have its linked graph vertex as 0 + 5 = 5
     For each passenger location in the passengers argument, add an edge from graph1 vertex to its corresponding graph2 vertex. This links the two graphs.
-    So when dijkstra is run, the shortest path will be found from the source to the passenger, then from the passenger to the
+    This prevents us from overlooking the fact that taking a detour, while initially costing more at first, may pay off in the long run.
+
+    Because of the linking, when dijkstra is run, the shortest path will be found from the source to the passenger, then from the passenger to the
     destination. If multiple detours to pick up passengers are available, only the best detour will be chosen.
 
-    Finally, compare the two results to decide if making the detour is worth it, and return the optimum path
+    Compare the two results(detour vs no detour) to decide if making the detour is worth it, and return the optimum path.
 
+    :Precondition: 
+        for each tuple(a,b,c,d) in roads, d<=c
+        for each integer in {start..end}, the integer appears at least once as either a or b in tuple(a, b, c, d)
+        there is a path from start to end & start != end
+        start not in passengers and end not in passengers
     :Input:
         start:Source
         end:Destination
@@ -432,7 +460,6 @@ def optimalRoute(start: int, end:int, passengers:list[int], roads:list[tuple[int
                       Since our graph is connected, E >= V, and given that P <= V <= E, E(log V) is greater than V and P, so we have O(E log V) overall
     :Aux space complexity: O(E + P + V), given that the passengers are a subset of the vertices, we know P <= V, V is greater than P, so we have overall O(E + V)
 
-
     """
 
     # to get the number of locations(vertices), O(E) assuming integer comparisons are O(1)
@@ -443,52 +470,27 @@ def optimalRoute(start: int, end:int, passengers:list[int], roads:list[tuple[int
             last_vertex = larger_location
     num_locations = last_vertex + 1
 
+    # create a new copy of the edges, also change the vertex values, e.g. if graph has 12 vertices from 0 to 11 , the new vertices are [12..23], O(2E) time and aux space 
+    additional_roads1 = [None for i in range(len(roads))] 
+    additional_roads2 = [None for i in range(len(roads))]
+    for i in range(len(roads)):
+        additional_roads1[i] = (roads[i][0], roads[i][1], roads[i][2], roads[i][3])
+        additional_roads2[i] = (roads[i][0]+num_locations, roads[i][1]+num_locations, roads[i][2], roads[i][3])
+    additional_roads1.extend(additional_roads2)
 
-    # create a new copy of the vertices, also change the vertex values, e.g. if graph has 12 vertices from 0 to 11 , the new vertices are [12..23], O(E) time and aux space 
-    additional_roads = [None for i in range(len(roads))] 
-    for i in range(len(additional_roads)):
-        additional_roads[i] = (roads[i][0]+num_locations, roads[i][1]+num_locations, roads[i][2], roads[i][3])
-
-    # O(E+P) time complexity, O(P) aux 
-    roads.extend(additional_roads) # O(E) time 
     # add the linking edge for each passenger, this is what "links" the two graphs, O(P) time
     for passenger in passengers:
-        roads.append((passenger, passenger + num_locations, 0, 0)) # O(P) aux space because add more edges to the roads
+        additional_roads1.append((passenger, passenger + num_locations, 0, 0)) # O(P) aux space because add more edges to the roads
 
     # O(2V+2E+2P) time and aux space complexity
-    newMapping = setup_mapping(num_locations*2, passengers, roads)
+    newMapping = setup_mapping(num_locations*2, passengers, additional_roads1)
 
-    graph = Graph(newMapping) 
 
-    # 2E log 2V time complexity, 2V aux space complexity for the heap
+    graph = Graph(newMapping) # O(1)3
+
+    # 2E log 2V time complexity, 2V aux space complexity for the heap, the constant 2 can be ignored
     route = dijkstra(graph, start, end+num_locations, last_vertex, end)
 
     return route
     
 
-
-if __name__ == '__main__':
-    # given example, taking detour helps shorten
-    # print(optimalRoute(0, 4, [2, 1],
-    #                    [(0, 3, 5, 3), (3, 4, 35, 15), (3, 2, 2, 2), (4, 0, 15, 10), (2, 4, 30, 25), (2, 0, 2, 2),
-    #                     (0, 1, 10, 10), (1, 4, 30, 20)]))
-
-    # some passengers are out of the way and they cannot reach destination, not worth it
-    # print(optimalRoute(0, 4, [3, 5, 11],
-    #                    [(1,4, 1, 1),(0, 1, 1, 1), (1, 2, 1, 1), (1, 6, 10, 1), (2, 3, 1, 1), (3, 7, 1, 1), (0, 5, 1, 1),(7,8,1,1), (8,1,1,1),(6,4,42,20),(1,9,1,1),(9,11,1,1),(11,10,1,1),(10,1,1,1)]))
-
-    # no passengers
-    # print(optimalRoute(0, 3, [],
-    #                    [(0, 1, 1, 1), (0, 2, 6, 6), (0, 4, 11, 11), (1, 3, 25, 15), (2, 3, 25, 8), (4, 3, 25, 1)]))
-
-    # some passengers are out of the way and they cannot reach destination, not worth taking detour, 
-    # print(optimalRoute(0, 4, [3, 5, 11], [(0, 1, 1, 1), (1, 2, 1, 1), (1, 6, 1, 1), (2, 3, 1, 1), (3, 7, 1, 1), (0, 5, 1, 1), (7, 8, 1, 1), (8, 1, 1, 1), (6, 4, 4, 1), (1, 9, 1, 1), (9, 11, 1, 1), (11, 10, 1, 1), (10, 1, 1, 1)]))
-
-    # some passengers are out of the way and they cannot reach destination, worth taking detour, 
-    # print(optimalRoute(0, 4, [3,5,11], [(0, 1, 1, 1), (1, 2, 1, 1), (1, 6, 1, 1), (2, 3, 1, 1), (3, 7, 1, 1), (0, 5, 1, 1), (7, 8, 1, 1), (8, 1, 1, 1), (6, 4, 6, 1), (1, 9, 1, 1), (9, 11, 1, 1), (11, 10, 1, 1), (10, 1, 1, 1)]))
-
-    start = 0
-    end = 3
-    roads = [(0, 1, 5, 5), (1, 3, 50, 5), (1, 2, 5, 1), (2, 1, 1, 1)]
-    passengers = [2]
-    print(optimalRoute(start, end, passengers, roads))
